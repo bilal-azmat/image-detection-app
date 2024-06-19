@@ -106,7 +106,9 @@ class _OnBoardingScreenState extends State<IntroScreen> {
                   width: width,
                   child: Text(
                     onBoardList[index].title,
-                    style: Theme.of(context).textTheme.displayMedium!.copyWith(
+                    style: Theme.of(context).textTheme.headlineSmall!.copyWith(
+                      fontWeight: FontWeight.w700,
+
 
                     ),
                     textAlign: TextAlign.center,

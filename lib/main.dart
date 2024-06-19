@@ -17,6 +17,7 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'Image Detection',
       theme: ThemeData(
+          fontFamily: 'Raleway',
 
         // This is the theme of your application.
         //

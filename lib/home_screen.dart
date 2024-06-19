@@ -23,17 +23,21 @@ class _CameraScreenState extends State<CameraScreen> {
   @override
   void initState() {
     super.initState();
-    availableCameras().then((availableCameras) {
-      cameras = availableCameras;
+    _initializeCamera();
+  }
+
+  Future<void> _initializeCamera() async {
+    try {
+      cameras = await availableCameras();
       if (cameras!.isNotEmpty) {
         setState(() {
           selectedCameraIdx = 0;
         });
         _initCameraController(cameras![selectedCameraIdx]);
       }
-    }).catchError((err) {
-      print('Error: $err.code\nError Message: $err.message');
-    });
+    } catch (e) {
+      print('Error: $e');
+    }
   }
 
   Future<void> _initCameraController(CameraDescription cameraDescription) async {
@@ -58,54 +62,54 @@ class _CameraScreenState extends State<CameraScreen> {
   }
 
   void _onSwitchCamera() {
-    selectedCameraIdx = selectedCameraIdx == 0 ? 1 : 0;
-    _initCameraController(cameras![selectedCameraIdx]);
-  }
-
-  Future<void> _takePicture() async {
-    try {
-      final directory = await getApplicationDocumentsDirectory();
-      final path = '${directory.path}/${DateTime.now().millisecondsSinceEpoch}.png';
-
-      await controller!.takePicture().then((XFile? file) {
-        if (file != null) {
-          setState(() {
-            imagePath = file.path;
-          });
-          _uploadImage(File(imagePath!));
-        }
-      });
-    } catch (e) {
-      print('Error taking picture: $e');
+    if (cameras != null && cameras!.length > 1) {
+      selectedCameraIdx = selectedCameraIdx == 0 ? 1 : 0;
+      _initCameraController(cameras![selectedCameraIdx]);
     }
   }
 
-  Future<void> _uploadImage(File image) async {
+  Future<void> _captureAndUploadImage() async {
     setState(() {
       isLoading = true;
     });
 
-    final uri = Uri.parse('http://192.168.1.102:5001/predict');
-    var request = http.MultipartRequest('POST', uri);
-    request.files.add(await http.MultipartFile.fromPath('file', image.path));
-
     try {
-      var response = await request.send();
-      if (response.statusCode == 200) {
-        var jsonResponse = await response.stream.bytesToString();
-        var predictions = jsonDecode(jsonResponse)['predictions'] as List;
-        var prediction = predictions.isNotEmpty ? predictions[0] : null;
+      final directory = await getApplicationDocumentsDirectory();
+      final path = '${directory.path}/${DateTime.now().millisecondsSinceEpoch}.png';
 
-        setState(() {
-          predictionResult = prediction;
-        });
+      await controller!.takePicture().then((XFile? file) async {
+        if (file != null) {
+          setState(() {
+            imagePath = file.path;
+          });
 
-        print('Prediction: $prediction');
-      } else {
-        print('Failed to upload image');
-      }
+          // Upload the image
+          final uri = Uri.parse('http://192.168.1.103:5001/predict');
+          var request = http.MultipartRequest('POST', uri);
+          request.files.add(await http.MultipartFile.fromPath('file', imagePath!));
+
+          try {
+            var response = await request.send();
+            if (response.statusCode == 200) {
+              var jsonResponse = await response.stream.bytesToString();
+              var predictions = jsonDecode(jsonResponse)['predictions'] as List;
+              var prediction = predictions.isNotEmpty ? predictions[0] : null;
+
+              setState(() {
+                predictionResult = prediction;
+              });
+
+              print('Prediction: $prediction');
+            } else {
+              print('Failed to upload image');
+            }
+          } catch (e) {
+            print('Upload error: $e');
+          }
+        }
+      });
     } catch (e) {
-      print('Upload error: $e');
+      print('Error capturing image: $e');
     } finally {
       setState(() {
         isLoading = false;
@@ -130,55 +134,53 @@ class _CameraScreenState extends State<CameraScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Camera'),
-      ),
-      body: Column(
-        children: <Widget>[
-          Expanded(
-            child: Stack(
-              children: [
-                CameraPreview(controller!),
-                if (imagePath != null)
-                  Positioned(
-                    bottom: 10,
-                    left: 10,
-                    child: Container(
-                      padding: EdgeInsets.all(8),
-                      color: Colors.white.withOpacity(0.8),
-                      child: Text(
-                        'Prediction: ${predictionResult ?? "Not Found!"}',
-                        style: TextStyle(fontSize: 18, color: Colors.black),
-                      ),
-                    ),
+      body: Container(
+        child: Stack(
+          children: [
+            Container(
+                height: MediaQuery.of(context).size.height,
+                child: CameraPreview(controller!)),
+            if (imagePath != null)
+              Positioned(
+                bottom: 100,
+                left: 10,
+                child: Container(
+                  padding: EdgeInsets.all(8),
+                  color: Colors.white.withOpacity(0.8),
+                  child: Text(
+                    'Prediction: ${predictionResult ?? ""}',
+                    style: TextStyle(fontSize: 18, color: Colors.black),
                   ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: <Widget>[
-                FloatingActionButton(
-                  heroTag: 'switch',
-                  child: Icon(Icons.switch_camera),
-                  onPressed: _onSwitchCamera,
                 ),
-                FloatingActionButton(
-                  heroTag: 'capture',
-                  child: Icon(Icons.camera),
-                  onPressed: isLoading ? null : _takePicture,
+              ),
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: Container(
+                color: Colors.black.withOpacity(0.7),
+                padding: const EdgeInsets.symmetric(vertical: 8.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: <Widget>[
+                    IconButton(
+                      icon: Icon(Icons.switch_camera, color: Colors.white),
+                      onPressed: _onSwitchCamera,
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.camera_alt, color: Colors.white),
+                      onPressed: isLoading ? null : _captureAndUploadImage,
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
-          ),
-          if (isLoading)
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: LinearProgressIndicator(),
-            ),
-        ],
+            if (isLoading)
+              Center(
+                child: CircularProgressIndicator(),
+              ),
+          ],
+        ),
       ),
     );
   }
