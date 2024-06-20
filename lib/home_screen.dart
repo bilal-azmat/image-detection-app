@@ -84,7 +84,7 @@ class _CameraScreenState extends State<CameraScreen> {
           });
 
           // Upload the image
-          final uri = Uri.parse('http://192.168.1.103:5001/predict');
+          final uri = Uri.parse('http://192.168.1.101:5001/predict');
           var request = http.MultipartRequest('POST', uri);
           request.files.add(await http.MultipartFile.fromPath('file', imagePath!));
 

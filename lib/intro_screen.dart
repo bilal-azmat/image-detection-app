@@ -124,7 +124,9 @@ class _OnBoardingScreenState extends State<IntroScreen> {
                   child: Text(
                     onBoardList[index].subTitle,
                     style: Theme.of(context).textTheme.headlineSmall!.copyWith(
-                        color: Colors.black,                        ),
+                        color: Colors.black,
+
+                    ),
                     textAlign: TextAlign.center,
                   ),
                 ),
